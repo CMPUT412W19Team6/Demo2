@@ -12,9 +12,22 @@ from kobuki_msgs.msg import BumperEvent
 # publishers
 twist_pub = None
 
+# twist messages
 forward_twist = Twist()
 forward_twist.angular.z = 0
 forward_twist.linear.x = 1
+
+backward_twist = Twist()
+backward_twist.angular.z = 0
+backward_twist.linear.x = -1
+
+left_twist = Twist()
+left_twist.angular.z = 1
+left_twist.linear.x = 0
+
+right_twist = Twist()
+right_twist.angular.z = -1
+right_twist.linear.x = 0
 
 rate = None
 
@@ -63,11 +76,11 @@ class Forward(smach.State):
                 twist_pub.publish(forward_twist)
                 rate.sleep()
 
-        if userdata.previous_output == "go_forward":
+        elif userdata.previous_output == "go_forward":
             start_pos = position
             while not rospy.is_shutdown():
-                diffs = [position.x - start_pos.x, position.y -
-                         start_pos.y, position.z - start_pos.z]
+                diffs = [abs(position.x - start_pos.x), abs(position.y -
+                                                            start_pos.y), abs(position.z - start_pos.z)]
 
                 if max(diffs) > userdata.forward_distance:
                     userdata.previous_output = "finish"
@@ -83,29 +96,77 @@ class Forward(smach.State):
                 twist_pub.publish(forward_twist)
                 rate.sleep()
 
+        return "done"
+
 
 class Backward(smach.State):
     def __init__(self):
         smach.State.__init__(self,
-                             outcomes=["bump", "finish"],
-                             input_keys=["previous_output"],
-                             output_keys=["previous_state"]
+                             outcomes=["finish"],
+                             input_keys=["previous_output",
+                                         "backward_distance"],
+                             output_keys=["previous_state", "previous_output"]
                              )
 
     def execute(self, userdata):
-        pass
+        global twist_pub
+        global backward_twist
+        global rate
+        global position
+
+        if userdata.previous_output == "go_back":
+            start_pos = position
+            while not rospy.is_shutdown():
+                diffs = [abs(position.x - start_pos.x), abs(position.y -
+                                                            start_pos.y), abs(position.z - start_pos.z)]
+
+                if max(diffs) > userdata.backward_distance:
+                    userdata.previous_output = "finish"
+                    userdata.previous_state = "BACKWARD"
+                    return "finish"
+
+                twist_pub.publish(backward_twist)
+                rate.sleep()
+
+        else:
+            # you shouldn't be here
+            return None
 
 
 class Turn(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                              outcomes=["finish"],
-                             input_keys=["previous_output"],
-                             output_keys=["previous_state"]
+                             input_keys=["previous_output", "turn_angle"],
+                             output_keys=["previous_state", "previous_output"]
                              )
 
     def execute(self, userdata):
-        pass
+        global orientation
+        global twist_pub
+        global rate
+
+        if userdata.previous_output == "go_turn":
+            if userdata.turn_angle > 0:
+                turn_twist = left_twist
+            else:
+                turn_twist = right_twist
+
+            start_orientation = math.degrees(orientation[2])
+
+            while not rospy.is_shutdown():
+                turned = abs(math.degrees(orientation[2])-start_orientation)
+                if turned > abs(userdata.turn_angle):
+                    userdata.previous_output = "finish"
+                    userdata.previous_state = "TURN"
+                    return "finish"
+
+                twist_pub.publish(turn_twist)
+                rate.sleep()
+        else:
+            # you shouldn't be here
+            print "in TURN, with wrong previous_output"
+            return None
 
 
 class Resolve(smach.State):
@@ -115,10 +176,28 @@ class Resolve(smach.State):
                                        "go_back", "go_turn"],
                              input_keys=["previous_output",
                                          "previous_state", "bumper_index"],
+                             output_keys=["previous_output",
+                                          "forward_distance", "backward_distance", "turn_angle"]
                              )
 
+        self.reset()
+
+    def reset(self):
+        self.current_round = 1
+        self.default_turn_angle = 90
+        self.default_moving_distance = 1
+        self.current_task = None
+        self.task_list = ["go_back", "turn_left", "go_forward_one", ]
+
     def execute(self, userdata):
-        pass
+        if userdata.previous_state == "FORWARD" and userdata.previous_output == "bump":
+            if not self.current_task:
+                self.current_task = "go_back"
+                userdata.previous_output = "go_back"
+                userdata.backward_distance = self.default_moving_distance
+                return self.current_task
+
+        # if userdata.previous_state == ""
 
 
 def odom_callback(data):
@@ -157,7 +236,6 @@ if __name__ == "__main__":
         })
 
         smach.StateMachine.add("BACKWARD", Backward(), transitions={
-            "bump": "RESOLVE",
             "finish": "RESOLVE"
         })
 
