@@ -169,6 +169,11 @@ class Turn(smach.State):
             return None
 
 
+current_round = 1
+current_task = 0
+left_start = None
+
+
 class Resolve(smach.State):
     def __init__(self):
         smach.State.__init__(self,
@@ -183,21 +188,100 @@ class Resolve(smach.State):
         self.reset()
 
     def reset(self):
-        self.current_round = 1
+        global current_round
+        global current_task
+        global left_start
+
+        current_round = 1
+        current_task 0
+        left_start = None
         self.default_turn_angle = 90
         self.default_moving_distance = 1
         self.current_task = None
-        self.task_list = ["go_back", "turn_left", "go_forward_one", ]
+        self.task_list = {1: "go_back", 2: "turn_left", 3: "go_forward", 4: "turn_right", 5: "continue_journey", 6: "revert",
+                          7: "turn_back", 8: "go_forward", 9: "turn_left", 10: "continue_journey", 11: "revert", 12: "turn_left_then_recycle"}
 
     def execute(self, userdata):
-        if userdata.previous_state == "FORWARD" and userdata.previous_output == "bump":
-            if not self.current_task:
-                self.current_task = "go_back"
-                userdata.previous_output = "go_back"
-                userdata.backward_distance = self.default_moving_distance
-                return self.current_task
+        global current_round
+        global current_task
+        global orientation
+        global position
+        global left_start
+        # if userdata.previous_state == "FORWARD" and userdata.previous_output == "bump":
+        #     if not self.current_task:
+        #         self.current_task = 1
+        #         userdata.previous_output = "go_back"
+        #         userdata.backward_distance = self.default_moving_distance
+        #         return self.current_task
 
         # if userdata.previous_state == ""
+        if current_task == 0:
+            # start task 1: go back
+            current_task += 1
+            userdata.previous_output = "go_back"
+            userdata.backward_distance = self.default_moving_distance
+            return "go_back"
+
+        if current_task == 1:
+            # start task 2: turn left
+            current_task += 1
+            current_angle = math.degrees(orientation[2])
+            userdata.turn_angle = self.default_turn_angle-current_angle
+            userdata.previous_output = "go_turn"
+            return "go_turn"
+
+        if current_task == 2:
+            # start task 3: go forward
+            current_task += 1
+            left_start = position.y
+            userdata.forward_distance = self.default_moving_distance
+            userdata.previous_output = "go_forward"
+            return "go_forward"
+
+        if current_task == 3:
+            if userdata.previous_output == "bump":
+                current_task = 5
+            else:
+                # start task 4: turn right
+                current_task += 1
+                userdata.turn_angle = -math.degrees(orientation[2])
+                userdata.previous_output = "go_turn"
+                return "go_turn"
+
+        if current_task == 4 or current_task == 9:
+            # start task 5/10: go forward
+            userdata.previous_output = "finish"
+            self.reset()
+            return "finish"
+
+        if current_task == 5:
+            # start task 6: revert - go backwards
+            current_task += 1
+            left_current = position.y
+            userdata.backward_distance = abs(left_current - left_start)
+            userdata.previous_output = "go_back"
+            return "go_back"
+
+        if current_task == 6:
+            # start task 7: turn around
+            current_task += 1
+            userdata.turn_angle = 180
+            userdata.previous_output = "go_turn"
+            return "go_turn"
+
+        if current_task == 7:
+            # start task 8: go forward (moving towards right)
+            current_task += 1
+            userdata.forward_distance = self.default_moving_distance
+            userdata.previous_output = "go_forward"
+            return "go_forward"
+
+        if current_task == 8:
+            # start task 9: turn left
+            current_task += 1
+            userdata.turn_angle = -math.degrees(orientation[2])
+            userdata.previous_output = "go_turn"
+            return "go_turn"
 
 
 def odom_callback(data):
