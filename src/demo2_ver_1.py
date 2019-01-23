@@ -193,7 +193,7 @@ class Resolve(smach.State):
         global left_start
 
         current_round = 1
-        current_task 0
+        current_task = 0
         left_start = None
         self.default_turn_angle = 90
         self.default_moving_distance = 1
