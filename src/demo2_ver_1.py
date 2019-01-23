@@ -16,7 +16,7 @@ forward_twist = Twist()
 forward_twist.angular.z = 0
 forward_twist.linear.x = 1
 
-rate = rospy.Rate(10)
+rate = None
 
 position = None
 orientation = None
@@ -141,7 +141,7 @@ def bump_callback(data):
 
 if __name__ == "__main__":
     rospy.init_node("demo2part2")
-
+    rate = rospy.Rate(10)
     sm = smach.StateMachine(outcomes=["exit"])
     sm.userdata.previous_output = None
 
