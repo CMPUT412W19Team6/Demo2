@@ -196,7 +196,7 @@ class Resolve(smach.State):
         current_task = 0
         left_start = None
         self.default_turn_angle = 90
-        self.default_moving_distance = 1
+        self.default_moving_distance = 0.4
         self.current_task = None
         self.task_list = {1: "go_back", 2: "turn_left", 3: "go_forward", 4: "turn_right", 5: "continue_journey", 6: "revert",
                           7: "turn_back", 8: "go_forward", 9: "turn_left", 10: "continue_journey", 11: "revert", 12: "turn_left_then_recycle"}
@@ -226,7 +226,7 @@ class Resolve(smach.State):
             # start task 2: turn left
             current_task += 1
             current_angle = math.degrees(orientation[2])
-            userdata.turn_angle = self.default_turn_angle-current_angle
+            userdata.turn_angle = self.default_turn_angle
             userdata.previous_output = "go_turn"
             return "go_turn"
 
@@ -244,7 +244,8 @@ class Resolve(smach.State):
             else:
                 # start task 4: turn right
                 current_task += 1
-                userdata.turn_angle = -math.degrees(orientation[2])
+                # userdata.turn_angle = -math.degrees(orientation[2])
+                userdata.turn_angle = -self.default_turn_angle
                 userdata.previous_output = "go_turn"
                 return "go_turn"
 
@@ -279,7 +280,8 @@ class Resolve(smach.State):
         if current_task == 8:
             # start task 9: turn left
             current_task += 1
-            userdata.turn_angle = -math.degrees(orientation[2])
+            # userdata.turn_angle = -math.degrees(orientation[2])
+            userdata.turn_angle = self.default_turn_angle
             userdata.previous_output = "go_turn"
             return "go_turn"
 
