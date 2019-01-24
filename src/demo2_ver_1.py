@@ -15,18 +15,18 @@ twist_pub = None
 # twist messages
 forward_twist = Twist()
 forward_twist.angular.z = 0
-forward_twist.linear.x = 1
+forward_twist.linear.x = 0.3
 
 backward_twist = Twist()
 backward_twist.angular.z = 0
-backward_twist.linear.x = -1
+backward_twist.linear.x = -0.3
 
 left_twist = Twist()
-left_twist.angular.z = 1
+left_twist.angular.z = 0.5
 left_twist.linear.x = 0
 
 right_twist = Twist()
-right_twist.angular.z = -1
+right_twist.angular.z = -0.5
 right_twist.linear.x = 0
 
 rate = None
@@ -71,6 +71,7 @@ class Forward(smach.State):
                     userdata.bumper_index = bumper_index
                     userdata.previous_output = "bump"
                     userdata.previous_state = "FORWARD"
+                    is_bumped = False
                     return "bump"
 
                 twist_pub.publish(forward_twist)
@@ -145,23 +146,22 @@ class Turn(smach.State):
         global orientation
         global twist_pub
         global rate
+        global left_twist
+        global right_twist
 
         if userdata.previous_output == "go_turn":
-            if userdata.turn_angle > 0:
-                turn_twist = left_twist
-            else:
-                turn_twist = right_twist
-
-            start_orientation = math.degrees(orientation[2])
+            
 
             while not rospy.is_shutdown():
-                turned = abs(math.degrees(orientation[2])-start_orientation)
-                if turned > abs(userdata.turn_angle):
+                current_orientation = math.degrees(orientation[2])
+                
+
+                if abs(current_orientation - userdata.turn_angle) < 5:
                     userdata.previous_output = "finish"
                     userdata.previous_state = "TURN"
                     return "finish"
 
-                twist_pub.publish(turn_twist)
+                twist_pub.publish(left_twist)
                 rate.sleep()
         else:
             # you shouldn't be here
@@ -196,7 +196,7 @@ class Resolve(smach.State):
         current_task = 0
         left_start = None
         self.default_turn_angle = 90
-        self.default_moving_distance = 0.4
+        self.default_moving_distance = 1
         self.current_task = None
         self.task_list = {1: "go_back", 2: "turn_left", 3: "go_forward", 4: "turn_right", 5: "continue_journey", 6: "revert",
                           7: "turn_back", 8: "go_forward", 9: "turn_left", 10: "continue_journey", 11: "revert", 12: "turn_left_then_recycle"}
@@ -226,7 +226,7 @@ class Resolve(smach.State):
             # start task 2: turn left
             current_task += 1
             current_angle = math.degrees(orientation[2])
-            userdata.turn_angle = self.default_turn_angle
+            userdata.turn_angle = 90
             userdata.previous_output = "go_turn"
             return "go_turn"
 
@@ -245,7 +245,7 @@ class Resolve(smach.State):
                 # start task 4: turn right
                 current_task += 1
                 # userdata.turn_angle = -math.degrees(orientation[2])
-                userdata.turn_angle = -self.default_turn_angle
+                userdata.turn_angle = -90
                 userdata.previous_output = "go_turn"
                 return "go_turn"
 
@@ -266,7 +266,7 @@ class Resolve(smach.State):
         if current_task == 6:
             # start task 7: turn around
             current_task += 1
-            userdata.turn_angle = 180
+            userdata.turn_angle = -90
             userdata.previous_output = "go_turn"
             return "go_turn"
 
@@ -281,7 +281,7 @@ class Resolve(smach.State):
             # start task 9: turn left
             current_task += 1
             # userdata.turn_angle = -math.degrees(orientation[2])
-            userdata.turn_angle = self.default_turn_angle
+            userdata.turn_angle = 0
             userdata.previous_output = "go_turn"
             return "go_turn"
 
