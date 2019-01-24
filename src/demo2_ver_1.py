@@ -15,18 +15,18 @@ twist_pub = None
 # twist messages
 forward_twist = Twist()
 forward_twist.angular.z = 0
-forward_twist.linear.x = 1
+forward_twist.linear.x = 0.1
 
 backward_twist = Twist()
 backward_twist.angular.z = 0
-backward_twist.linear.x = -1
+backward_twist.linear.x = -0.1
 
 left_twist = Twist()
-left_twist.angular.z = 1
+left_twist.angular.z = 0.3
 left_twist.linear.x = 0
 
 right_twist = Twist()
-right_twist.angular.z = -1
+right_twist.angular.z = -0.3
 right_twist.linear.x = 0
 
 rate = None
@@ -145,18 +145,22 @@ class Turn(smach.State):
         global orientation
         global twist_pub
         global rate
+        global left_twist
+        global right_twist
 
         if userdata.previous_output == "go_turn":
-            if userdata.turn_angle > 0:
+            if userdata.turn_angle > 0 and userdata.turn_angle < 180:
                 turn_twist = left_twist
             else:
                 turn_twist = right_twist
 
             start_orientation = math.degrees(orientation[2])
+            rospy.logwarn(start_orientation)
 
             while not rospy.is_shutdown():
                 turned = abs(math.degrees(orientation[2])-start_orientation)
-                if turned > abs(userdata.turn_angle):
+                rospy.logwarn(turned)
+                if turned > (abs(userdata.turn_angle)):
                     userdata.previous_output = "finish"
                     userdata.previous_state = "TURN"
                     return "finish"
@@ -196,7 +200,7 @@ class Resolve(smach.State):
         current_task = 0
         left_start = None
         self.default_turn_angle = 90
-        self.default_moving_distance = 0.4
+        self.default_moving_distance = 0.5
         self.current_task = None
         self.task_list = {1: "go_back", 2: "turn_left", 3: "go_forward", 4: "turn_right", 5: "continue_journey", 6: "revert",
                           7: "turn_back", 8: "go_forward", 9: "turn_left", 10: "continue_journey", 11: "revert", 12: "turn_left_then_recycle"}
@@ -207,14 +211,7 @@ class Resolve(smach.State):
         global orientation
         global position
         global left_start
-        # if userdata.previous_state == "FORWARD" and userdata.previous_output == "bump":
-        #     if not self.current_task:
-        #         self.current_task = 1
-        #         userdata.previous_output = "go_back"
-        #         userdata.backward_distance = self.default_moving_distance
-        #         return self.current_task
 
-        # if userdata.previous_state == ""
         if current_task == 0:
             # start task 1: go back
             current_task += 1
@@ -265,8 +262,15 @@ class Resolve(smach.State):
 
         if current_task == 6:
             # start task 7: turn around
-            current_task += 1
-            userdata.turn_angle = 180
+            current_task += 0.5
+            userdata.turn_angle = -90
+            userdata.previous_output = "go_turn"
+            return "go_turn"
+
+        if current_task == 6.5:
+            # start task 7: turn around
+            current_task += 0.5
+            userdata.turn_angle = -90
             userdata.previous_output = "go_turn"
             return "go_turn"
 
@@ -306,7 +310,7 @@ def bump_callback(data):
 
 if __name__ == "__main__":
     rospy.init_node("demo2part2")
-    rate = rospy.Rate(10)
+    rate = rospy.Rate(100)
     sm = smach.StateMachine(outcomes=["exit"])
     sm.userdata.previous_output = None
 
